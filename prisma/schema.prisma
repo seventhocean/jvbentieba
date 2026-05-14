@@ -1,0 +1,199 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  passwordHash String
+  nickname     String     @unique
+  avatarUrl    String?
+  bio          String?
+  role         Role       @default(USER)
+  status       UserStatus @default(ACTIVE)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  posts     Post[]
+  comments  Comment[]
+  likes     Like[]
+  favorites Favorite[]
+  reports   Report[]
+  followers Follow[]   @relation("Followee")
+  following Follow[]   @relation("Follower")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  BANNED
+}
+
+model Topic {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  description String   @default("")
+  coverUrl    String?
+  isPreset    Boolean  @default(false)
+  postCount   Int      @default(0)
+  followCount Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  posts   Post[]
+  follows Follow[]
+}
+
+model Post {
+  id            String     @id @default(cuid())
+  authorId      String
+  topicId       String
+  title         String
+  content       String     @db.Text
+  status        PostStatus @default(PUBLISHED)
+  likeCount     Int        @default(0)
+  commentCount  Int        @default(0)
+  favoriteCount Int        @default(0)
+  viewCount     Int        @default(0)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  author    User       @relation(fields: [authorId], references: [id])
+  topic     Topic      @relation(fields: [topicId], references: [id])
+  images    Image[]
+  comments  Comment[]
+  likes     Like[]
+  favorites Favorite[]
+
+  @@index([topicId, createdAt])
+  @@index([authorId, createdAt])
+  @@index([createdAt])
+}
+
+enum PostStatus {
+  PUBLISHED
+  HIDDEN
+  DELETED
+}
+
+model Image {
+  id       String @id @default(cuid())
+  postId   String
+  url      String
+  thumbUrl String?
+  width    Int?
+  height   Int?
+  order    Int    @default(0)
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+}
+
+model Comment {
+  id        String        @id @default(cuid())
+  postId    String
+  authorId  String
+  parentId  String?
+  content   String        @db.VarChar(500)
+  likeCount Int           @default(0)
+  status    CommentStatus @default(PUBLISHED)
+  createdAt DateTime      @default(now())
+
+  post    Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author  User      @relation(fields: [authorId], references: [id])
+  parent  Comment?  @relation("Replies", fields: [parentId], references: [id])
+  replies Comment[] @relation("Replies")
+  likes   Like[]
+
+  @@index([postId, createdAt])
+  @@index([parentId])
+}
+
+enum CommentStatus {
+  PUBLISHED
+  DELETED
+}
+
+model Like {
+  id        String     @id @default(cuid())
+  userId    String
+  targetId  String
+  type      LikeTarget
+  createdAt DateTime   @default(now())
+
+  user    User     @relation(fields: [userId], references: [id])
+  post    Post?    @relation(fields: [targetId], references: [id], map: "like_post_fk")
+  comment Comment? @relation(fields: [targetId], references: [id], map: "like_comment_fk")
+
+  @@unique([userId, targetId, type])
+}
+
+enum LikeTarget {
+  POST
+  COMMENT
+}
+
+model Favorite {
+  userId    String
+  postId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+  post Post @relation(fields: [postId], references: [id])
+
+  @@id([userId, postId])
+}
+
+model Follow {
+  id            String     @id @default(cuid())
+  followerId    String
+  type          FollowType
+  targetUserId  String?
+  targetTopicId String?
+  createdAt     DateTime   @default(now())
+
+  follower   User  @relation("Follower", fields: [followerId], references: [id])
+  targetUser User? @relation("Followee", fields: [targetUserId], references: [id])
+  topic      Topic? @relation(fields: [targetTopicId], references: [id])
+
+  @@unique([followerId, type, targetUserId])
+  @@unique([followerId, type, targetTopicId])
+}
+
+enum FollowType {
+  USER
+  TOPIC
+}
+
+model Report {
+  id         String       @id @default(cuid())
+  reporterId String
+  targetType ReportTarget
+  targetId   String
+  reason     String
+  detail     String?
+  status     ReportStatus @default(OPEN)
+  createdAt  DateTime     @default(now())
+
+  reporter User @relation(fields: [reporterId], references: [id])
+}
+
+enum ReportTarget {
+  POST
+  COMMENT
+  USER
+}
+
+enum ReportStatus {
+  OPEN
+  RESOLVED
+  REJECTED
+}
