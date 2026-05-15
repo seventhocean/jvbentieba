@@ -14,7 +14,7 @@ export async function GET(req: Request) {
     where: { userId: user.id },
     orderBy: { createdAt: "desc" },
     take: limit + 1,
-    ...(cursor ? { cursor: { postId: cursor, userId: user.id } } : {}),
+    ...(cursor ? { cursor: { userId_postId: { userId: user.id, postId: cursor } } } : {}),
     include: {
       post: {
         include: {
